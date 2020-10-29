@@ -479,7 +479,7 @@ export class SubscriptionClient {
 
   // send message, or queue it if connection is not open
   private sendMessageRaw(message: Object) {
-    if(!this.isConnected) this.unsentMessagesQueue.push(message);
+    if(!this.isConnected && message.type === MessageTypes.GQL_START) this.unsentMessagesQueue.push(message);
     switch (this.status) {
       case this.wsImpl.OPEN:
         let serializedMessage: string = JSON.stringify(message);
