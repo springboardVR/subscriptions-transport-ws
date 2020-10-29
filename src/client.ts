@@ -478,7 +478,7 @@ export class SubscriptionClient {
   }
 
   // send message, or queue it if connection is not open
-  private sendMessageRaw(message: Object) {
+  private sendMessageRaw(message: { id: string, type: string, payload: any }) {
     if(!this.isConnected && message.type === MessageTypes.GQL_START) {
       this.unsentMessagesQueue.push(message);
       return
