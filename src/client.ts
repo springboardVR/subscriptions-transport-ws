@@ -81,6 +81,7 @@ export class SubscriptionClient {
   private unsentMessagesQueue: Array<any>; // queued messages while websocket is opening.
   private reconnect: boolean;
   private reconnecting: boolean;
+  private isConnected: boolean;
   private reconnectionAttempts: number;
   private backoff: any;
   private connectionCallback: any;
@@ -132,6 +133,7 @@ export class SubscriptionClient {
     this.unsentMessagesQueue = [];
     this.reconnect = reconnect;
     this.reconnecting = false;
+    this.isConnected = false;
     this.reconnectionAttempts = reconnectionAttempts;
     this.lazy = !!lazy;
     this.inactivityTimeout = inactivityTimeout;
@@ -241,6 +243,7 @@ export class SubscriptionClient {
   }
 
   public onConnected(callback: ListenerFn, context?: any): Function {
+    this.isConnected = true;
     return this.on('connected', callback, context);
   }
 
@@ -249,10 +252,12 @@ export class SubscriptionClient {
   }
 
   public onDisconnected(callback: ListenerFn, context?: any): Function {
+    this.isConnected = false;
     return this.on('disconnected', callback, context);
   }
 
   public onReconnected(callback: ListenerFn, context?: any): Function {
+    this.isConnected = true;
     return this.on('reconnected', callback, context);
   }
 
@@ -474,6 +479,7 @@ export class SubscriptionClient {
 
   // send message, or queue it if connection is not open
   private sendMessageRaw(message: Object) {
+    if(!this.isConnected) this.unsentMessagesQueue.push(message);
     switch (this.status) {
       case this.wsImpl.OPEN:
         let serializedMessage: string = JSON.stringify(message);
@@ -484,10 +490,6 @@ export class SubscriptionClient {
         }
 
         this.client.send(serializedMessage);
-        break;
-      case this.wsImpl.CONNECTING:
-        this.unsentMessagesQueue.push(message);
-
         break;
       default:
         if (!this.reconnecting) {
@@ -569,7 +571,6 @@ export class SubscriptionClient {
 
           // Send CONNECTION_INIT message, no need to wait for connection to success (reduce roundtrips)
           this.sendMessage(undefined, MessageTypes.GQL_CONNECTION_INIT, connectionParams);
-          this.flushUnsentMessagesQueue();
         } catch (error) {
           this.sendMessage(undefined, MessageTypes.GQL_CONNECTION_ERROR, error);
           this.flushUnsentMessagesQueue();
@@ -628,7 +629,7 @@ export class SubscriptionClient {
         this.reconnecting = false;
         this.backoff.reset();
         this.maxConnectTimeGenerator.reset();
-
+        this.flushUnsentMessagesQueue();
         if (this.connectionCallback) {
           this.connectionCallback();
         }
