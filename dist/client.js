@@ -377,7 +377,7 @@ var SubscriptionClient = (function () {
         this.sendMessageRaw(this.buildMessage(id, type, payload));
     };
     SubscriptionClient.prototype.sendMessageRaw = function (message) {
-        if (!this.isConnected)
+        if (!this.isConnected && message.type === message_types_1.default.GQL_START)
             this.unsentMessagesQueue.push(message);
         switch (this.status) {
             case this.wsImpl.OPEN:
