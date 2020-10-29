@@ -149,6 +149,10 @@ export class SubscriptionClient {
     if (!this.lazy) {
       this.connect();
     }
+
+    this.on('connected', () => { this.isConnected = true; });
+    this.on('reconnected', () => { this.isConnected = true; });
+    this.on('disconnected', () => { this.isConnected = false; });
   }
 
   public get status() {
@@ -243,7 +247,6 @@ export class SubscriptionClient {
   }
 
   public onConnected(callback: ListenerFn, context?: any): Function {
-    this.isConnected = true;
     return this.on('connected', callback, context);
   }
 
@@ -252,12 +255,10 @@ export class SubscriptionClient {
   }
 
   public onDisconnected(callback: ListenerFn, context?: any): Function {
-    this.isConnected = false;
     return this.on('disconnected', callback, context);
   }
 
   public onReconnected(callback: ListenerFn, context?: any): Function {
-    this.isConnected = true;
     return this.on('reconnected', callback, context);
   }
 
