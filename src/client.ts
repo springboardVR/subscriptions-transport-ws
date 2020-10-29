@@ -81,6 +81,7 @@ export class SubscriptionClient {
   private unsentMessagesQueue: Array<any>; // queued messages while websocket is opening.
   private reconnect: boolean;
   private reconnecting: boolean;
+  private isConnected: boolean;
   private reconnectionAttempts: number;
   private backoff: any;
   private connectionCallback: any;
@@ -132,6 +133,7 @@ export class SubscriptionClient {
     this.unsentMessagesQueue = [];
     this.reconnect = reconnect;
     this.reconnecting = false;
+    this.isConnected = false;
     this.reconnectionAttempts = reconnectionAttempts;
     this.lazy = !!lazy;
     this.inactivityTimeout = inactivityTimeout;
@@ -147,6 +149,10 @@ export class SubscriptionClient {
     if (!this.lazy) {
       this.connect();
     }
+
+    this.on('connected', () => { this.isConnected = true; });
+    this.on('reconnected', () => { this.isConnected = true; });
+    this.on('disconnected', () => { this.isConnected = false; });
   }
 
   public get status() {
@@ -473,7 +479,11 @@ export class SubscriptionClient {
   }
 
   // send message, or queue it if connection is not open
-  private sendMessageRaw(message: Object) {
+  private sendMessageRaw(message: { id: string, type: string, payload: any }) {
+    if(!this.isConnected && message.type === MessageTypes.GQL_START) {
+      this.unsentMessagesQueue.push(message);
+      return
+    }
     switch (this.status) {
       case this.wsImpl.OPEN:
         let serializedMessage: string = JSON.stringify(message);
@@ -484,10 +494,6 @@ export class SubscriptionClient {
         }
 
         this.client.send(serializedMessage);
-        break;
-      case this.wsImpl.CONNECTING:
-        this.unsentMessagesQueue.push(message);
-
         break;
       default:
         if (!this.reconnecting) {
@@ -569,7 +575,6 @@ export class SubscriptionClient {
 
           // Send CONNECTION_INIT message, no need to wait for connection to success (reduce roundtrips)
           this.sendMessage(undefined, MessageTypes.GQL_CONNECTION_INIT, connectionParams);
-          this.flushUnsentMessagesQueue();
         } catch (error) {
           this.sendMessage(undefined, MessageTypes.GQL_CONNECTION_ERROR, error);
           this.flushUnsentMessagesQueue();
@@ -628,7 +633,7 @@ export class SubscriptionClient {
         this.reconnecting = false;
         this.backoff.reset();
         this.maxConnectTimeGenerator.reset();
-
+        this.flushUnsentMessagesQueue();
         if (this.connectionCallback) {
           this.connectionCallback();
         }
